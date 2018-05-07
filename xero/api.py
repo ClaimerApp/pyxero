@@ -48,7 +48,9 @@ class Xero(object):
 
         setattr(self, "filesAPI", Files(credentials))
         setattr(self, "payrollAPI", Payroll(credentials, unit_price_4dps,
-                                            user_agent))
+                                            user_agent, 1))
+        setattr(self, "payrollAPIv2", Payroll(credentials, unit_price_4dps,
+                                            user_agent, 2))
 
 
 class Files(object):
@@ -71,7 +73,7 @@ class Files(object):
 
 
 class Payroll(object):
-    """An ORM-like interface to the Xero Payroll API"""
+    """An ORM-like interface to the Xero Payroll API v2"""
 
     OBJECT_LIST = (
         "Employees",
@@ -83,7 +85,7 @@ class Payroll(object):
         "LeaveApplications",
     )
 
-    def __init__(self, credentials, unit_price_4dps=False, user_agent=None):
+    def __init__(self, credentials, unit_price_4dps=False, user_agent=None, api_version=2):
         for name in self.OBJECT_LIST:
             setattr(self, name.lower(), PayrollManager(name, credentials, unit_price_4dps,
-                                                       user_agent))
+                                                       user_agent, api_version))

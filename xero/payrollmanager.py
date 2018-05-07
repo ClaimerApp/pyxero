@@ -3,17 +3,23 @@ from __future__ import unicode_literals
 import requests
 
 from .constants import XERO_PAYROLL_URL
+from .constants import XERO_PAYROLL_URL_V2
 from .utils import singular
 from .basemanager import BaseManager
 
 
 class PayrollManager(BaseManager):
 
-    def __init__(self, name, credentials, unit_price_4dps=False, user_agent=None):
+    def __init__(self, name, credentials, unit_price_4dps=False, user_agent=None, api_version=2):
         from xero import __version__ as VERSION
         self.credentials = credentials
         self.name = name
-        self.base_url = credentials.base_url + XERO_PAYROLL_URL
+
+        if api_version == 2:
+            self.base_url = credentials.base_url + XERO_PAYROLL_URL_V2
+        else:
+            self.base_url = credentials.base_url + XERO_PAYROLL_URL
+
         self.extra_params = {"unitdp": 4} if unit_price_4dps else {}
         self.singular = singular(name)
 
