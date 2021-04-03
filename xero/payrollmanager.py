@@ -4,6 +4,8 @@ import requests
 
 from .basemanager import BaseManager
 from .constants import XERO_PAYROLL_URL
+
+# isort: split
 from .constants import XERO_PAYROLL_URL_V2
 from .utils import singular
 
