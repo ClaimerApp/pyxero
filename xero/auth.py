@@ -9,6 +9,7 @@ from requests_oauthlib import OAuth1, OAuth2, OAuth2Session
 
 from .constants import (
     ACCESS_TOKEN_URL,
+    MIGRATE_URL,
     AUTHORIZE_URL,
     REQUEST_TOKEN_URL,
     XERO_BASE_URL,
@@ -234,39 +235,7 @@ class PublicCredentials:
                 seconds=int(oauth_authorisation_expires_in)
             )
         else:
-            self._handle_error_response(response)
-
-    def _handle_error_response(self, response):
-        if response.status_code == 400:
-            raise XeroBadRequest(response)
-
-        elif response.status_code == 401:
-            raise XeroUnauthorized(response)
-
-        elif response.status_code == 403:
-            raise XeroForbidden(response)
-
-        elif response.status_code == 404:
-            raise XeroNotFound(response)
-
-        elif response.status_code == 500:
-            raise XeroInternalError(response)
-
-        elif response.status_code == 501:
-            raise XeroNotImplemented(response)
-
-        elif response.status_code == 503:
-            # Two 503 responses are possible. Rate limit errors
-            # return encoded content; offline errors don't.
-            # If you parse the response text and there's nothing
-            # encoded, it must be a not-available error.
-            payload = parse_qs(response.text)
-            if payload:
-                raise XeroRateLimitExceeded(response, payload)
-            else:
-                raise XeroNotAvailable(response)
-        else:
-            raise XeroExceptionUnknown(response)
+            handle_error_response(response)
 
     @property
     def state(self):
@@ -437,6 +406,82 @@ class PartnerCredentials(PublicCredentials):
             auth=oauth,
         )
         self._process_oauth_response(response)
+
+    def migrate(self, redirect_uri: str, client_id: str, client_secret: str, scope: str = None):
+        """
+        Migrate existing connections
+        # https://developer.xero.com/documentation/oauth2/migrate
+
+        **The migrate endpoint**
+        Required elements in a migration request:
+
+        scope      The scopes required for your integration.
+                   It must include the offline_access scope and at least one other scope.
+                   It must not include any OpenID scopes.
+                   These must be explicitly consented by the user separately (e.g. as part of a Sign in with Xero flow).
+
+        redirect_uri     Must match a redirect URI saved against your app when you created your OAuth 2.0 credentials.
+
+        client_id    Your client id
+        client_secret    Your client secret
+
+        #
+        A successful response includes:
+
+        {
+            "access_token":"eyJhbGciOiJSUzI1NiIsImtpZCI6IjFDQUY4RTY2NzfQmsifQ.....",
+            "refresh_token":"c93ed3cf37a9a41bb9b5e7cf10e30a08f1e357adf",
+            "expires_in":"1800",
+            "token_type":"Bearer",
+            "xero_tenant_id":"45e4708e-d862-4111-ab3a-dd8cd03913e1"
+        }
+
+        """
+
+        # Construct the credentials for the verification request
+        oauth = OAuth1(
+            self.consumer_key,
+            client_secret=self.consumer_secret,
+            resource_owner_key=self.oauth_token,
+            resource_owner_secret=self.oauth_token_secret,
+            rsa_key=self.rsa_key,
+            signature_method=self._signature_method,
+        )
+
+        headers = {"User-Agent": self.user_agent}
+
+        scope = scope or self.scope or ""
+        if isinstance(scope, list):
+            scope = ",".join(scope)
+
+        if XeroScopes.OFFLINE_ACCESS not in scope:
+            scope = ",".join((scope, XeroScopes.OFFLINE_ACCESS))
+
+        # I could not do migration without adding this!
+        if XeroScopes.ACCOUNTING_SETTINGS_READ not in scope:
+            scope = ",".join((scope, XeroScopes.ACCOUNTING_SETTINGS_READ))
+
+        scope = scope.replace(",", " ")
+
+        json_body = {
+            "scope": scope,  # "your_oauth_2_scopes + offline_access"
+            "redirect_uri": redirect_uri,  # URI saved against your app when you created your OAuth 2.0 credentials
+            "client_id": client_id,  # "your_app_client_id"
+            "client_secret": client_secret,  # "your_app_client_secret"
+        }
+
+        response = requests.post(
+            url=self.base_url + MIGRATE_URL,
+            json=json_body,
+            headers=headers,
+            auth=oauth,
+        )
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print("error migrating! resp text:", response.text)
+            handle_error_response(response)
 
 
 class OAuth2Credentials(object):
@@ -647,7 +692,7 @@ class OAuth2Credentials(object):
         if response.status_code == 200:
             return response.json()
         else:
-            self._handle_error_response(response)
+            handle_error_response(response)
 
     def set_default_tenant(self):
         """A quick way to set the tenant to the first in the list of available
@@ -663,35 +708,35 @@ class OAuth2Credentials(object):
                 "to the organisation(s) been removed?",
             )
 
-    @staticmethod
-    def _handle_error_response(response):
-        if response.status_code == 400:
-            raise XeroBadRequest(response)
 
-        elif response.status_code == 401:
-            raise XeroUnauthorized(response)
+def handle_error_response(response):
+    if response.status_code == 400:
+        raise XeroBadRequest(response)
 
-        elif response.status_code == 403:
-            raise XeroForbidden(response)
+    elif response.status_code == 401:
+        raise XeroUnauthorized(response)
 
-        elif response.status_code == 404:
-            raise XeroNotFound(response)
+    elif response.status_code == 403:
+        raise XeroForbidden(response)
 
-        elif response.status_code == 500:
-            raise XeroInternalError(response)
+    elif response.status_code == 404:
+        raise XeroNotFound(response)
 
-        elif response.status_code == 501:
-            raise XeroNotImplemented(response)
+    elif response.status_code == 500:
+        raise XeroInternalError(response)
 
-        elif response.status_code == 503:
-            # Two 503 responses are possible. Rate limit errors
-            # return encoded content; offline errors don't.
-            # If you parse the response text and there's nothing
-            # encoded, it must be a not-available error.
-            payload = parse_qs(response.text)
-            if payload:
-                raise XeroRateLimitExceeded(response, payload)
-            else:
-                raise XeroNotAvailable(response)
+    elif response.status_code == 501:
+        raise XeroNotImplemented(response)
+
+    elif response.status_code == 503:
+        # Two 503 responses are possible. Rate limit errors
+        # return encoded content; offline errors don't.
+        # If you parse the response text and there's nothing
+        # encoded, it must be a not-available error.
+        payload = parse_qs(response.text)
+        if payload:
+            raise XeroRateLimitExceeded(response, payload)
         else:
-            raise XeroExceptionUnknown(response)
+            raise XeroNotAvailable(response)
+    else:
+        raise XeroExceptionUnknown(response)
