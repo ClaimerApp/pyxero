@@ -2,6 +2,7 @@ from __future__ import unicode_literals
 
 import datetime
 import requests
+import jwt
 from six.moves.urllib.parse import parse_qs, urlencode
 
 from oauthlib.oauth1 import SIGNATURE_HMAC, SIGNATURE_RSA, SIGNATURE_TYPE_AUTH_HEADER
@@ -644,7 +645,13 @@ class OAuth2Credentials(object):
     @property
     def expires_at(self):
         """Return the expires_at value from the token as a UTC datetime."""
-        return datetime.datetime.utcfromtimestamp(self.token["expires_at"])
+        ts_exp = self.token.get("expires_at")
+        if not ts_exp:
+            # decode body and get 'exp' from there
+            payload = jwt.decode(self.token["access_token"], verify=False)
+            ts_exp = payload["exp"]
+
+        return datetime.datetime.utcfromtimestamp(ts_exp)
 
     def expired(self, seconds=30, now=None):
         """Check if the token has expired yet.
