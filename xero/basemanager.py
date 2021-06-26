@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 import json
 import requests
 import six
+import logging
 from datetime import datetime
 from six.moves.urllib.parse import parse_qs
 from xml.etree.ElementTree import Element, SubElement, tostring
@@ -22,6 +23,8 @@ from .exceptions import (
     XeroUnauthorized,
 )
 from .utils import isplural, json_load_object_hook, singular
+
+logger = logging.getLogger(__name__)
 
 
 class BaseManager(object):
@@ -222,9 +225,16 @@ class BaseManager(object):
             # or individual user/partner
             headers["User-Agent"] = self.user_agent
 
-            print(requests, method, uri, body, headers, params, self.credentials.oauth)
+            logger.debug("requests: %s", requests)
+            logger.debug("method: %s", method)
+            logger.debug("uri: %s", uri)
+            logger.debug("body: %s", body)
+            logger.debug("headers: %s", headers)
+            logger.debug("params: %s", params)
+            logger.debug("self.credentials.oauth: %s", self.credentials.oauth)
 
-            response = getattr(requests, method)(
+            response = requests.request(
+                method,
                 uri,
                 data=body,
                 headers=headers,
@@ -232,6 +242,8 @@ class BaseManager(object):
                 params=params,
                 timeout=timeout,
             )
+
+            logger.debug('response %s with text %s', response, response.text)
 
             if response.status_code == 200:
                 # If we haven't got XML or JSON, assume we're being returned a
