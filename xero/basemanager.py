@@ -233,8 +233,7 @@ class BaseManager(object):
             logger.debug("params: %s", params)
             logger.debug("self.credentials.oauth: %s", self.credentials.oauth)
 
-            response = requests.request(
-                method,
+            response = getattr(requests, method)(
                 uri,
                 data=body,
                 headers=headers,
