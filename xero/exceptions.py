@@ -72,11 +72,18 @@ class XeroUnauthorized(XeroException):
     # HTTP 401: Unauthorized
     def __init__(self, response):
         payload = parse_qs(response.text)
-        self.errors = [payload["oauth_problem"][0]]
+        if payload:
+            self.errors = [payload["oauth_problem"][0]]
+            msg = payload["oauth_problem_advice"][0]
+        else:
+            data = response.json()  # type: dict
+            problem = data.get("problem", {})  # type: dict
+            detail = problem.get("detail")
+            self.errors = [problem.get("title"), detail]
+            msg = detail
+
         self.problem = self.errors[0]
-        super(XeroUnauthorized, self).__init__(
-            response, payload["oauth_problem_advice"][0]
-        )
+        super(XeroUnauthorized, self).__init__(response, msg)
 
 
 class XeroForbidden(XeroException):
