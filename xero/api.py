@@ -90,6 +90,7 @@ class Payroll(object):
         "PayrollCalendars",
         "Payslip",
         "LeaveApplications",
+        "earningsRates",
     )
 
     def __init__(self, credentials, unit_price_4dps=False, user_agent=None, api_version=2):
